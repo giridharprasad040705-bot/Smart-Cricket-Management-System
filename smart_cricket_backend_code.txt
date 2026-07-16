@@ -1,0 +1,388 @@
+================================================================================
+SMART CRICKET MANAGEMENT SYSTEM - PYTHON FASTAPI BACKEND CODE
+================================================================================
+This file contains the complete source code for the backend service.
+Below you will find the contents for each of the 6 files:
+1. requirements.txt
+2. config.py
+3. models.py
+4. schemas.py
+5. services.py
+6. main.py
+
+Copy and save each block into its respective file in your project folder.
+
+================================================================================
+1. requirements.txt
+================================================================================
+fastapi>=0.100.0
+uvicorn>=0.22.0
+sqlalchemy>=2.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+pymysql>=1.1.0
+cryptography>=41.0.0
+
+================================================================================
+2. config.py
+================================================================================
+import os
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # Default is SQLite for easy testing, but can be overridden with MySQL
+    DATABASE_URL: str = "sqlite:///./smart_cricket.db"
+    
+    # To run on MySQL, specify the connection string in your .env file:
+    # DATABASE_URL = "mysql+pymysql://root:root@localhost:3306/smart_cricket"
+    
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+================================================================================
+3. models.py
+================================================================================
+from sqlalchemy import Column, Integer, String, Float, Date, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Player(Base):
+    __tablename__ = "players"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    age = Column(Integer)
+    role = Column(String(50)) # Batsman, Bowler, All-rounder
+    matches_played = Column(Integer, default=0)
+    total_runs = Column(Integer, default=0)
+    total_wickets = Column(Integer, default=0)
+    batting_average = Column(Float, default=0.0)
+    strike_rate = Column(Float, default=0.0)
+    economy = Column(Float, default=0.0)
+    consistency_score = Column(Float, default=0.0) # Computed internally
+
+class CricketMatch(Base):
+    __tablename__ = "cricket_matches"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    team1 = Column(String(100))
+    team2 = Column(String(100))
+    venue = Column(String(255))
+    match_date = Column(Date)
+    overs = Column(Integer)
+    format = Column(String(20)) # T20, ODI, Test
+    status = Column(String(50), default="Scheduled") # Scheduled, Ongoing, Completed
+    team1_score = Column(Integer, default=0)
+    team1_wickets = Column(Integer, default=0)
+    team2_score = Column(Integer, default=0)
+    team2_wickets = Column(Integer, default=0)
+    result = Column(String(255))
+
+class Official(Base):
+    __tablename__ = "officials"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    role = Column(String(50)) # Umpire, Scorer
+    experience_years = Column(Integer, default=0)
+    rating = Column(Float, default=0.0)
+    matches_officiated = Column(Integer, default=0)
+    is_available = Column(Boolean, default=True)
+
+================================================================================
+4. schemas.py
+================================================================================
+from pydantic import BaseModel
+from typing import Optional
+from datetime import date
+
+class PlayerBase(BaseModel):
+    name: str
+    age: int
+    role: str
+    matches_played: int = 0
+    total_runs: int = 0
+    total_wickets: int = 0
+    batting_average: float = 0.0
+    strike_rate: float = 0.0
+    economy: float = 0.0
+    consistency_score: float = 0.0
+
+class PlayerCreate(PlayerBase):
+    pass
+
+class PlayerResponse(PlayerBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+class MatchBase(BaseModel):
+    team1: str
+    team2: str
+    venue: str
+    match_date: Optional[date] = None
+    overs: int
+    format: str
+    status: str = "Scheduled"
+    team1_score: int = 0
+    team1_wickets: int = 0
+    team2_score: int = 0
+    team2_wickets: int = 0
+    result: Optional[str] = None
+
+class MatchCreate(MatchBase):
+    pass
+
+class MatchResponse(MatchBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+================================================================================
+5. services.py
+================================================================================
+import bisect
+import heapq
+from typing import List, Dict, Optional
+from sqlalchemy.orm import Session
+import models
+
+# Helper wrapper to sort objects by their name lowercase inside the binary search list
+class PlayerSortWrapper:
+    def __init__(self, player: models.Player):
+        self.player = player
+        
+    def __lt__(self, other):
+        return self.player.name.lower() < other.player.name.lower()
+
+class PlayerService:
+    def __init__(self, db: Session):
+        self.db = db
+        # Data Structure 1: HashMap (dict) for O(1) fast ID lookups
+        self.player_cache: Dict[int, models.Player] = {}
+        # Data Structure 2: ArrayList (list) sorted by name for O(log N) Binary Search
+        self.sorted_players: List[models.Player] = []
+        self.refresh_cache()
+
+    def refresh_cache(self):
+        self.player_cache.clear()
+        self.sorted_players.clear()
+        
+        all_players = self.db.query(models.Player).all()
+        for p in all_players:
+            self.player_cache[p.id] = p
+            self.sorted_players.append(p)
+            
+        # Ensure the list is sorted for binary search
+        self.sorted_players.sort(key=lambda x: x.name.lower())
+
+    def add_player(self, player_data) -> models.Player:
+        player = models.Player(**player_data.model_dump())
+        self.db.add(player)
+        self.db.commit()
+        self.db.refresh(player)
+        
+        # O(1) Cache insertion
+        self.player_cache[player.id] = player
+        
+        # Maintain sorted order dynamically using bisect module
+        wrapper = PlayerSortWrapper(player)
+        wrapped_list = [PlayerSortWrapper(p) for p in self.sorted_players]
+        idx = bisect.bisect_left(wrapped_list, wrapper)
+        self.sorted_players.insert(idx, player)
+        
+        return player
+
+    def get_player_by_id_fast(self, player_id: int) -> Optional[models.Player]:
+        # Fast lookup via Cache HashMap
+        return self.player_cache.get(player_id)
+
+    def get_all_players(self) -> List[models.Player]:
+        return list(self.player_cache.values())
+
+    # Data Structure 3: O(log N) Binary Search
+    def search_player_by_name_fast(self, name: str) -> Optional[models.Player]:
+        target_name = name.lower()
+        left = 0
+        right = len(self.sorted_players) - 1
+        
+        while left <= right:
+            mid = (left + right) // 2
+            mid_player = self.sorted_players[mid]
+            mid_name = mid_player.name.lower()
+            
+            if mid_name == target_name:
+                return mid_player
+            elif mid_name < target_name:
+                left = mid + 1
+            else:
+                right = mid - 1
+        return None
+
+class AnalyticsService:
+    def __init__(self, player_service: PlayerService):
+        self.player_service = player_service
+
+    # Data Structure 4: Priority Queue (Max-Heap) implementation
+    def get_top_players(self, limit: int) -> List[models.Player]:
+        # Python heapq is a min-heap by default.
+        # We push (-score, id, player_object) to simulate a Max-Heap ranking.
+        heap = []
+        all_players = self.player_service.get_all_players()
+        
+        for p in all_players:
+            # Recalculate score matching the Java version consistency formula
+            calculated_score = (p.batting_average * 0.4) + (p.strike_rate * 0.4) + (p.consistency_score * 0.2)
+            p.consistency_score = calculated_score
+            heapq.heappush(heap, (-calculated_score, p.id, p))
+
+        top_players = []
+        for _ in range(min(limit, len(heap))):
+            _, _, player = heapq.heappop(heap)
+            top_players.append(player)
+            
+        return top_players
+
+    def analyze_player(self, player_id: int) -> str:
+        p = self.player_service.get_player_by_id_fast(player_id)
+        if not p:
+            return "Player not found"
+        
+        insights = f"Insights for {p.name}: "
+        if p.strike_rate > 140:
+            insights += "Strong finisher. "
+        elif p.strike_rate < 100:
+            insights += "Needs improvement in scoring rate. "
+            
+        if p.batting_average > 40:
+            insights += "Highly consistent. "
+        elif p.batting_average < 20:
+            insights += "Needs improvement in batting consistency. "
+            
+        return insights
+
+class MatchService:
+    def __init__(self, db: Session):
+        self.db = db
+        # Data Structure 5: ArrayList (list) for match history logs
+        self.match_history: List[models.CricketMatch] = []
+
+    def schedule_match(self, match_data) -> models.CricketMatch:
+        match = models.CricketMatch(**match_data.model_dump())
+        match.status = "Scheduled"
+        self.db.add(match)
+        self.db.commit()
+        self.db.refresh(match)
+        
+        self.match_history.append(match)
+        return match
+
+    def get_match_history(self) -> List[models.CricketMatch]:
+        if not self.match_history:
+            self.match_history = self.db.query(models.CricketMatch).all()
+        return list(self.match_history)
+
+================================================================================
+6. main.py
+================================================================================
+from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from typing import List
+
+import models
+import schemas
+from config import settings
+from services import PlayerService, AnalyticsService, MatchService
+
+# Setup DB connection
+engine = create_engine(
+    settings.DATABASE_URL, 
+    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Auto-create database tables (similar to spring.jpa.hibernate.ddl-auto=update)
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Smart Cricket Management System API", version="1.0.0")
+
+# Enable CORS for frontend integration (similar to Spring's @CrossOrigin)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Dependency injection for DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# Service Dependencies
+def get_player_service(db: Session = Depends(get_db)):
+    return PlayerService(db)
+
+def get_analytics_service(player_service: PlayerService = Depends(get_player_service)):
+    return AnalyticsService(player_service)
+
+def get_match_service(db: Session = Depends(get_db)):
+    return MatchService(db)
+
+
+# --- API Routes ---
+
+@app.get("/api/players", response_model=List[schemas.PlayerResponse])
+def get_all_players(service: PlayerService = Depends(get_player_service)):
+    return service.get_all_players()
+
+@app.post("/api/players", response_model=schemas.PlayerResponse)
+def add_player(player: schemas.PlayerCreate, service: PlayerService = Depends(get_player_service)):
+    return service.add_player(player)
+
+@app.get("/api/players/search", response_model=schemas.PlayerResponse)
+def search_player(name: str, service: PlayerService = Depends(get_player_service)):
+    player = service.search_player_by_name_fast(name)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return player
+
+@app.get("/api/players/{player_id}", response_model=schemas.PlayerResponse)
+def get_player(player_id: int, service: PlayerService = Depends(get_player_service)):
+    player = service.get_player_by_id_fast(player_id)
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return player
+
+@app.get("/api/analytics/top-players", response_model=List[schemas.PlayerResponse])
+def get_top_players(limit: int = Query(default=10), service: AnalyticsService = Depends(get_analytics_service)):
+    return service.get_top_players(limit)
+
+@app.get("/api/analytics/player/{player_id}/insights")
+def get_player_insights(player_id: int, service: AnalyticsService = Depends(get_analytics_service)):
+    insights = service.analyze_player(player_id)
+    return {"insights": insights}
+
+@app.post("/api/matches", response_model=schemas.MatchResponse)
+def schedule_match(match: schemas.MatchCreate, service: MatchService = Depends(get_match_service)):
+    return service.schedule_match(match)
+
+@app.get("/api/matches", response_model=List[schemas.MatchResponse])
+def get_match_history(service: MatchService = Depends(get_match_service)):
+    return service.get_match_history()
+
+if __name__ == "__main__":
+    import uvicorn
+    # Runs the development server on port 8080
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
