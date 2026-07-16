@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Cricket Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">🏏 SmartCricket</div>
+        <ul class="nav-links">
+            <li><a href="#" class="active" onclick="showTab('selector')">Selector Dashboard</a></li>
+            <li><a href="#" onclick="showTab('players')">Players</a></li>
+            <li><a href="#" onclick="showTab('register')">Player Registration</a></li>
+            <li><a href="#" onclick="showTab('matches')">Matches</a></li>
+        </ul>
+    </nav>
+
+    <main class="container">
+        
+        <!-- SELECTOR DASHBOARD -->
+        <section id="selector-dashboard" class="tab-content active">
+            <header class="section-header">
+                <h1>Selector's Private Hub</h1>
+                <p>Search via Binary Search instantly, and discover top-ranked local talent when needed.</p>
+            </header>
+
+            <div class="glass-card stat-card" style="margin-bottom: 2rem;">
+                <h2>Search specific talent instantly</h2>
+                <div style="display:flex; gap: 1rem; align-items:center;">
+                    <input type="text" id="player-search" class="search-input" placeholder="Search Player by Exact Match Name..." style="flex:1;">
+                    <button class="btn primary-btn" onclick="searchPlayer()">Analyze & Open Profile</button>
+                </div>
+                <div id="player-insight-result" class="insight-box" style="display:none; margin-top:1rem;"></div>
+            </div>
+
+            <div class="glass-card stat-card">
+                <h2>Advanced Filtering & Top Ranking</h2>
+                <div style="display:flex; gap: 1rem; margin-top:1rem; flex-wrap: wrap;">
+                    <select id="filter-role" class="search-input" style="flex:1" onchange="filterSelectorPlayers()">
+                        <option value="All">All Roles</option>
+                        <option value="Batsman">Batsman</option>
+                        <option value="Bowler">Bowler</option>
+                        <option value="All-rounder">All-rounder</option>
+                    </select>
+                    <input type="number" id="filter-min-avg" class="search-input" placeholder="Min Average" style="flex:1" oninput="filterSelectorPlayers()">
+                    <input type="number" id="filter-min-sr" class="search-input" placeholder="Min Strike Rate" style="flex:1" oninput="filterSelectorPlayers()">
+                </div>
+                <div class="player-list" id="top-players-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+            
+            <div class="glass-card stat-card" style="margin-top: 2rem;">
+                <h2>Player Performance Insights</h2>
+                <div id="player-insight-result-old" class="insight-box" style="display:none;"></div>
+            </div>
+        </section>
+
+        <!-- PLAYERS MODULE -->
+        <section id="players-dashboard" class="tab-content">
+            <header class="section-header">
+                <h1>Player Management</h1>
+                <p>Manage all registered cricketers</p>
+            </header>
+            <div class="glass-card table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Matches</th>
+                            <th>Runs</th>
+                            <th>Wickets</th>
+                            <th>Avg</th>
+                            <th>SR</th>
+                        </tr>
+                    </thead>
+                    <tbody id="all-players-body">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- MATCHES MODULE -->
+        <section id="matches-dashboard" class="tab-content">
+            <header class="section-header">
+                <h1>Conduct & Manage Matches</h1>
+                <p>Create new matches, track live scores prominently.</p>
+            </header>
+
+            <div class="glass-card stat-card" style="margin-bottom: 2rem;">
+                <h2>Admin: Conduct New Match</h2>
+                <form id="create-match-form" onsubmit="handleCreateMatch(event)" style="display:flex; gap: 1rem; margin-top:1rem; align-items:center; flex-wrap: wrap;">
+                    
+                    <datalist id="ipl-teams-list">
+                        <option value="Chennai Super Kings">
+                        <option value="Mumbai Indians">
+                        <option value="Royal Challengers Bangalore">
+                        <option value="Kolkata Knight Riders">
+                        <option value="Delhi Capitals">
+                        <option value="Sunrisers Hyderabad">
+                        <option value="Rajasthan Royals">
+                        <option value="Punjab Kings">
+                        <option value="Lucknow Super Giants">
+                        <option value="Gujarat Titans">
+                    </datalist>
+
+                    <input type="text" id="cm-t1" placeholder="Team 1 Name" list="ipl-teams-list" required class="search-input">
+                    <input type="text" id="cm-t2" placeholder="Team 2 Name" list="ipl-teams-list" required class="search-input">
+                    <input type="text" id="cm-venue" placeholder="Venue" required class="search-input">
+                    <input type="number" id="cm-overs" placeholder="Max Overs (e.g. 20, 50)" required class="search-input" style="width:180px;" min="1" max="100">
+                    <button type="submit" class="btn primary-btn">Select Playing XI & Start</button>
+                </form>
+            </div>
+
+            <div class="match-grid" id="match-grid">
+                <!-- Matches Populated By JS -->
+            </div>
+        </section>
+
+        <!-- REGISTRATION MODULE -->
+        <section id="register-dashboard" class="tab-content">
+            <header class="section-header">
+                <h1>Local Talent Registration</h1>
+                <p>Register as a player so selectors can discover you and your track record locally.</p>
+            </header>
+            <div class="glass-card">
+                <form id="registration-form" onsubmit="handleRegistration(event)">
+                    <div class="form-group">
+                        <label>Player Name</label>
+                        <input type="text" id="reg-name" required class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                    </div>
+                    <div class="form-group">
+                        <label>Role</label>
+                        <select id="reg-role" required class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                            <option value="Batsman">Batsman</option>
+                            <option value="Bowler">Bowler</option>
+                            <option value="All-rounder">All-rounder</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap: 1rem;">
+                        <div class="form-group" style="flex:1">
+                            <label>Matches Played</label>
+                            <input type="number" id="reg-matches" required value="0" min="0" class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Total Runs</label>
+                            <input type="number" id="reg-runs" required value="0" min="0" class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Wickets</label>
+                            <input type="number" id="reg-wickets" required value="0" min="0" class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>Not Outs</label>
+                            <input type="number" id="reg-notouts" required value="0" min="0" class="search-input" style="max-width:100%; margin-bottom: 1rem;">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn primary-btn" style="width: 100%;">Submit Registration</button>
+                    <div id="reg-success" style="color:var(--accent); margin-top: 1rem; display:none;">Registration Successful! You can now be discovered by Selectors.</div>
+                </form>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- PLAYER PROFILE MODAL -->
+    <div id="player-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center; backdrop-filter: blur(5px);">
+        <div class="glass-card" style="width: 90%; max-width: 600px; max-height:80vh; overflow-y:auto; position:relative;">
+            <button onclick="closeModal()" style="position:absolute; top:1rem; right:1rem; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <h2 id="modal-name" style="color:var(--primary); margin-bottom:0.5rem;">Player Profile</h2>
+            <p id="modal-role" style="color:var(--text-muted); margin-bottom: 2rem;">Role</p>
+            
+            <h3>Statistical Summary</h3>
+            <div style="display:flex; gap: 1rem; margin: 1rem 0; background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px;">
+                <div><small>Matches</small><br><b id="modal-matches">0</b></div>
+                <div><small>Runs</small><br><b id="modal-runs">0</b></div>
+                <div><small>Wickets</small><br><b id="modal-wickets">0</b></div>
+                <div><small>Avg</small><br><b id="modal-avg">0</b></div>
+                <div><small>SR</small><br><b id="modal-sr">0</b></div>
+            </div>
+
+            <h3>Past Match History</h3>
+            <div id="modal-history" style="margin-top: 1rem; display:flex; flex-direction:column; gap:0.5rem;">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- BALL-BY-BALL SCORING MODAL -->
+    <datalist id="player-names-list"></datalist>
+
+    <div id="scoring-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:flex-start; overflow-y:auto; padding:2rem 0; backdrop-filter: blur(5px);">
+        <div class="glass-card" style="width: 95%; max-width: 600px; position:relative; padding-top: 3rem;">
+            <button onclick="closeScoringModal()" style="position:absolute; top:1rem; right:1rem; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <h2 style="color:var(--accent); text-align:center;">Ball-by-Ball Live Scoring</h2>
+            <p id="scoring-format" style="color:var(--text-muted); margin-bottom:2rem; text-align:center;"></p>
+            
+            <div style="text-align:center; margin-bottom: 2rem;">
+                <h1 id="scoring-live-score" style="font-size:3rem; margin:0;">0/0</h1>
+                <p id="scoring-overs" style="color:var(--primary); font-size:1.2rem; font-weight:bold;">Overs: 0.0</p>
+                <p id="scoring-batting-team" style="color:var(--text-muted);">Batting: Team 1</p>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px; margin-bottom: 1rem;">
+                <h3 style="margin-bottom:0.5rem">Active Squads on Field</h3>
+                <div style="display:flex; gap:1rem; margin-bottom: 1rem;">
+                    <div style="flex:1; border:1px solid rgba(255,255,255,0.1); padding:0.5rem; border-radius:8px;">
+                        <h4 style="color:var(--accent);">Batting XI</h4>
+                        <div id="ui-bat-squad" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem;"></div>
+                    </div>
+                    <div style="flex:1; border:1px solid rgba(255,255,255,0.1); padding:0.5rem; border-radius:8px;">
+                        <h4 style="color:var(--primary);">Bowling XI</h4>
+                        <div id="ui-bowl-squad" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.5rem;"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+                    <input type="text" id="sc-striker" list="active-bat-list" class="search-input" placeholder="Striker Name" style="flex:1" title="Select or type to Auto-Register">
+                    <input type="text" id="sc-nonstriker" list="active-bat-list" class="search-input" placeholder="Non-Striker Name" style="flex:1">
+                    <input type="text" id="sc-bowler" list="active-bowl-list" class="search-input" placeholder="Bowler Name" style="flex:1" title="Select or type to Auto-Register">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; text-align:center;">
+                <button class="btn" style="background:#334155; color:white;" onclick="recordBall(0, 0, false)">0 (Dot)</button>
+                <button class="btn" style="background:#3b82f6; color:white;" onclick="recordBall(1, 0, false)">1</button>
+                <button class="btn" style="background:#3b82f6; color:white;" onclick="recordBall(2, 0, false)">2</button>
+                <button class="btn" style="background:#3b82f6; color:white;" onclick="recordBall(3, 0, false)">3</button>
+                <button class="btn" style="background:#10b981; color:white;" onclick="recordBall(4, 0, false)">4</button>
+                <button class="btn" style="background:#10b981; color:white;" onclick="recordBall(6, 0, false)">6</button>
+                <button class="btn" style="background:#eab308; color:black;" onclick="recordBall(0, 1, false)">Wide</button>
+                <button class="btn" style="background:#eab308; color:black;" onclick="recordBall(0, 2, false)">No Ball</button>
+                <button class="btn" style="background:#ef4444; color:white; grid-column: span 2;" onclick="recordBall(0, 0, true)">Wicket!</button>
+                <button class="btn" style="background:#64748b; color:white; grid-column: span 2;" onclick="switchInnings()">End Innings</button>
+            </div>
+
+            <button class="btn primary-btn" style="width:100%; margin-top:2rem; background:linear-gradient(to right, #ec4899, #ef4444);" onclick="endMatchAndSync()">End Match & Update Complete Data</button>
+        </div>
+    </div>
+
+    <!-- FULL MATCH SCORECARD MODAL -->
+    <div id="full-scorecard-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:2000; justify-content:center; align-items:center; backdrop-filter: blur(5px);">
+        <div class="glass-card" style="width: 95%; max-width: 800px; max-height:90vh; overflow-y:auto; position:relative;">
+            <button onclick="closeScorecardModal()" style="position:absolute; top:1rem; right:1rem; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <h2 style="color:var(--primary); margin-bottom:1rem; text-align:center;" id="scorecard-title">Full Match Scorecard</h2>
+            <div id="scorecard-content">
+                <!-- Dynamically populated by JSON -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SQUAD SELECTION MODAL 11v11 -->
+    <div id="squad-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:3000; justify-content:center; align-items:center; overflow-y:auto; padding:2rem 0; backdrop-filter: blur(5px);">
+        <div class="glass-card" style="width: 95%; max-width: 900px; position:relative;">
+            <button onclick="closeSquadModal()" style="position:absolute; top:1rem; right:1rem; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;">&times;</button>
+            <h2 style="color:var(--accent); text-align:center; padding-bottom: 1rem;">Select Playing XI</h2>
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap: 1rem;">
+                <div style="flex:1; min-width: 300px; background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px;">
+                    <h3 id="squad-t1-title" style="margin-bottom:1rem; color:var(--primary);">Team 1</h3>
+                    <div id="squad-t1-inputs" style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <!-- JS injects 11 inputs -->
+                    </div>
+                </div>
+                <div style="flex:1; min-width: 300px; background:rgba(255,255,255,0.05); padding:1rem; border-radius:8px;">
+                    <h3 id="squad-t2-title" style="margin-bottom:1rem; color:var(--primary);">Team 2</h3>
+                    <div id="squad-t2-inputs" style="display:flex; flex-direction:column; gap:0.5rem;">
+                        <!-- JS injects 11 inputs -->
+                    </div>
+                </div>
+            </div>
+            <button class="btn primary-btn" style="width:100%; margin-top:2rem; background:linear-gradient(to right, #10b981, #3b82f6);" onclick="confirmSquadAndStart()">Finalize XI & Start Match Engine</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
